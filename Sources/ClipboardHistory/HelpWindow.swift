@@ -39,14 +39,19 @@ class HelpWindow {
         }
         func appendShortcut(_ key: String, _ desc: String) {
             let line = NSMutableAttributedString()
-            line.append(NSAttributedString(string: key, attributes: [
-                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
-                .foregroundColor: NSColor.labelColor
-            ]))
-            line.append(NSAttributedString(string: "    \(desc)\n", attributes: [
+            line.append(NSAttributedString(string: "\(key)\t\(desc)\n", attributes: [
                 .font: NSFont.systemFont(ofSize: 13),
                 .foregroundColor: NSColor.secondaryLabelColor
             ]))
+            // Apply monospace font to the key part (before tab)
+            line.addAttributes([
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
+                .foregroundColor: NSColor.labelColor
+            ], range: NSRange(location: 0, length: key.count))
+            // Add tab stop for alignment
+            let paraStyle = NSMutableParagraphStyle()
+            paraStyle.tabStops = [NSTextTab(textAlignment: .left, location: 160, options: [:])]
+            line.addAttribute(.paragraphStyle, value: paraStyle, range: NSRange(location: 0, length: line.length))
             content.append(line)
         }
 
