@@ -3,7 +3,6 @@ import AppKit
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Check accessibility permissions (needed for simulating Cmd+V)
@@ -36,13 +35,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         _ = HotKeyManager.shared.register()
 
-        // Monitor keyboard events when our window is active
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if HistoryWindowController.shared.handleKeyEvent(event) {
-                return nil // consumed
-            }
-            return event
-        }
+        // Keyboard events are handled by HistoryPanel (NSPanel subclass)
+        // via its keyDown override, which only intercepts events directed
+        // to our panel and never interferes with modal dialog text input.
     }
 
     private func checkAccessibilityPermissions() {
@@ -65,9 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func manageCategories() {
-        // Show the window first to ensure it's visible, then open category management
         HistoryWindowController.shared.show()
-        // The "管理分类…" action is triggered through the popup button
     }
 
     @objc private func clearHistory() {

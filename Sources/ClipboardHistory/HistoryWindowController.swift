@@ -1,6 +1,17 @@
 import Foundation
 import AppKit
 
+// MARK: - Custom Panel with keyDown handling
+
+class HistoryPanel: NSPanel {
+    override func keyDown(with event: NSEvent) {
+        if HistoryWindowController.shared.handleKeyEvent(event) {
+            return
+        }
+        super.keyDown(with: event)
+    }
+}
+
 class HistoryWindowController: NSObject {
     static let shared = HistoryWindowController()
 
@@ -20,15 +31,13 @@ class HistoryWindowController: NSObject {
     private var previousApp: NSRunningApplication?
 
     private override init() {
-        // Create the floating panel
-        window = NSPanel(
+        window = HistoryPanel(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 500),
             styleMask: [.nonactivatingPanel, .titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
 
-        // Visual effect view (vibrancy)
         visualEffectView = NSVisualEffectView(frame: window.contentRect(forFrameRect: window.frame))
         visualEffectView.material = .popover
         visualEffectView.state = .active
@@ -36,35 +45,29 @@ class HistoryWindowController: NSObject {
         visualEffectView.layer?.cornerRadius = 12
         visualEffectView.layer?.masksToBounds = true
 
-        // Top row: search field + category popup
         topRowView = NSView()
         topRowView.translatesAutoresizingMaskIntoConstraints = false
 
-        // Create search field
         searchField = NSSearchField()
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.placeholderString = "搜索..."
 
-        // Create category popup button
         categoryPopUp = NSPopUpButton()
         categoryPopUp.translatesAutoresizingMaskIntoConstraints = false
         categoryPopUp.bezelStyle = .rounded
         categoryPopUp.pullsDown = false
 
-        // Add button (for custom categories)
         addButton = NSButton(title: "+", target: nil, action: nil)
         addButton.translatesAutoresizingMaskIntoConstraints = false
         addButton.bezelStyle = .rounded
         addButton.isHidden = true
         addButton.toolTip = "添加代码块"
 
-        // Create table column
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("text"))
         column.title = ""
         column.isEditable = false
         column.width = 440
 
-        // Create table view
         tableView = NSTableView()
         tableView.wantsLayer = true
         tableView.backgroundColor = .clear
@@ -74,7 +77,6 @@ class HistoryWindowController: NSObject {
         tableView.selectionHighlightStyle = .regular
         tableView.addTableColumn(column)
 
-        // Scroll view wrapping the table
         scrollView = NSScrollView(frame: visualEffectView.bounds)
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = false
@@ -83,7 +85,6 @@ class HistoryWindowController: NSObject {
 
         super.init()
 
-        // Setup targets and delegates after super.init
         tableView.target = self
         tableView.doubleAction = #selector(doubleClickRow)
         tableView.menu = createContextMenu()
@@ -96,7 +97,6 @@ class HistoryWindowController: NSObject {
         addButton.target = self
         addButton.action = #selector(addItem)
 
-        // Configure window
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = true
@@ -109,7 +109,6 @@ class HistoryWindowController: NSObject {
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
 
-        // Layout
         visualEffectView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -128,29 +127,24 @@ class HistoryWindowController: NSObject {
                 visualEffectView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
                 visualEffectView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-                // Top row
                 topRowView.topAnchor.constraint(equalTo: visualEffectView.topAnchor, constant: 12),
                 topRowView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor, constant: 12),
                 topRowView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor, constant: -12),
                 topRowView.heightAnchor.constraint(equalToConstant: 24),
 
-                // Search field
                 searchField.leadingAnchor.constraint(equalTo: topRowView.leadingAnchor),
                 searchField.centerYAnchor.constraint(equalTo: topRowView.centerYAnchor),
                 searchField.trailingAnchor.constraint(equalTo: categoryPopUp.leadingAnchor, constant: -8),
 
-                // Category popup
                 categoryPopUp.trailingAnchor.constraint(equalTo: addButton.leadingAnchor, constant: -4),
                 categoryPopUp.centerYAnchor.constraint(equalTo: topRowView.centerYAnchor),
                 categoryPopUp.widthAnchor.constraint(equalToConstant: 140),
 
-                // Add button
                 addButton.trailingAnchor.constraint(equalTo: topRowView.trailingAnchor),
                 addButton.centerYAnchor.constraint(equalTo: topRowView.centerYAnchor),
                 addButton.widthAnchor.constraint(equalToConstant: 28),
                 addButton.heightAnchor.constraint(equalToConstant: 24),
 
-                // Table scroll view
                 scrollView.topAnchor.constraint(equalTo: topRowView.bottomAnchor, constant: 8),
                 scrollView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor, constant: 8),
                 scrollView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor, constant: -8),
@@ -161,7 +155,6 @@ class HistoryWindowController: NSObject {
         tableView.dataSource = self
         tableView.delegate = self
 
-        // Empty state label
         let emptyField = NSTextField(labelWithString: "暂无内容")
         emptyField.alignment = .center
         emptyField.textColor = .secondaryLabelColor
@@ -438,8 +431,6 @@ class HistoryWindowController: NSObject {
 
     // MARK: - Multiline Input Dialog
 
-    /// Shows a dialog with a multiline text view (NSTextView) instead of a single-line NSTextField.
-    /// Returns the entered text and whether the user accepted.
     private func showMultilineInputDialog(title: String, message: String, placeholder: String?, defaultValue: String) -> (String, Bool) {
         let alert = NSAlert()
         alert.messageText = title
@@ -447,11 +438,11 @@ class HistoryWindowController: NSObject {
         alert.addButton(withTitle: "确定")
         alert.addButton(withTitle: "取消")
 
-        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 120))
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .bezelBorder
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 120))
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        scroll.autohidesScrollers = true
+        scroll.borderType = .bezelBorder
 
         let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 360, height: 120))
         textView.font = NSFont.systemFont(ofSize: 13)
@@ -460,20 +451,12 @@ class HistoryWindowController: NSObject {
         textView.isSelectable = true
         textView.autoresizingMask = [.width, .height]
 
-        if defaultValue.isEmpty {
-            textView.string = ""
-        }
-
-        scrollView.documentView = textView
-
-        alert.accessoryView = scrollView
-
-        // Make text view the first responder
+        scroll.documentView = textView
+        alert.accessoryView = scroll
         alert.window.initialFirstResponder = textView
 
         let response = alert.runModal()
         let text = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
-
         return (text, response == .alertFirstButtonReturn)
     }
 
@@ -490,7 +473,6 @@ class HistoryWindowController: NSObject {
         panel.isMovableByWindowBackground = true
         panel.titlebarAppearsTransparent = true
 
-        // Table for category list
         let catTable = NSTableView()
         catTable.wantsLayer = true
         catTable.backgroundColor = .clear
@@ -544,12 +526,10 @@ class HistoryWindowController: NSObject {
                 catScroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
                 catScroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
                 catScroll.bottomAnchor.constraint(equalTo: buttonRow.topAnchor, constant: -8),
-
                 buttonRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
                 buttonRow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
                 buttonRow.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
                 buttonRow.heightAnchor.constraint(equalToConstant: 28),
-
                 addBtn.leadingAnchor.constraint(equalTo: buttonRow.leadingAnchor),
                 addBtn.centerYAnchor.constraint(equalTo: buttonRow.centerYAnchor),
                 renameBtn.leadingAnchor.constraint(equalTo: addBtn.trailingAnchor, constant: 8),
@@ -564,7 +544,6 @@ class HistoryWindowController: NSObject {
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Data source
         let dataSource = CategoryManagementDataSource(tableView: catTable, panel: panel)
         catTable.dataSource = dataSource
         catTable.delegate = dataSource
@@ -646,19 +625,15 @@ class CategoryManagementDataSource: NSObject, NSTableViewDataSource, NSTableView
         !categories[row].isDefault
     }
 
-    // MARK: - Actions
-
     @objc func addCategory() {
         let alert = NSAlert()
         alert.messageText = "新建分类"
         alert.informativeText = "输入分类名称："
         alert.addButton(withTitle: "创建")
         alert.addButton(withTitle: "取消")
-
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 250, height: 20))
         textField.placeholderString = "分类名称..."
         alert.accessoryView = textField
-
         if alert.runModal() == .alertFirstButtonReturn {
             let name = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if !name.isEmpty {
@@ -672,17 +647,14 @@ class CategoryManagementDataSource: NSObject, NSTableViewDataSource, NSTableView
         let selectedRow = tableView.selectedRow
         guard selectedRow >= 0, selectedRow < categories.count, !categories[selectedRow].isDefault else { return }
         let cat = categories[selectedRow]
-
         let alert = NSAlert()
         alert.messageText = "重命名分类"
         alert.informativeText = "输入新名称："
         alert.addButton(withTitle: "保存")
         alert.addButton(withTitle: "取消")
-
         let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 250, height: 20))
         textField.stringValue = cat.name
         alert.accessoryView = textField
-
         if alert.runModal() == .alertFirstButtonReturn {
             let newName = textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if !newName.isEmpty {
@@ -696,14 +668,12 @@ class CategoryManagementDataSource: NSObject, NSTableViewDataSource, NSTableView
         let selectedRow = tableView.selectedRow
         guard selectedRow >= 0, selectedRow < categories.count, !categories[selectedRow].isDefault else { return }
         let cat = categories[selectedRow]
-
         let alert = NSAlert()
         alert.messageText = "删除分类「\(cat.name)」？"
         alert.informativeText = "该分类下的所有代码块将被永久删除。"
         alert.addButton(withTitle: "删除")
         alert.addButton(withTitle: "取消")
         alert.alertStyle = .warning
-
         if alert.runModal() == .alertFirstButtonReturn {
             CategoryManager.shared.deleteCategory(id: cat.id)
             reload()
@@ -738,15 +708,12 @@ extension HistoryWindowController: NSTableViewDataSource {
     func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
         guard let catId = currentCategoryId else { return false }
         guard let pbItem = info.draggingPasteboard.pasteboardItems?.first,
-              let idString = pbItem.string(forType: .string),
-              let _ = UUID(uuidString: idString) else { return false }
+              let idString = pbItem.string(forType: .string) else { return false }
 
         var currentIds = filteredItems.map(\.id.uuidString)
         guard let fromIndex = currentIds.firstIndex(of: idString) else { return false }
-
         currentIds.remove(at: fromIndex)
         currentIds.insert(idString, at: row)
-
         let uuidIds = currentIds.compactMap { UUID(uuidString: $0) }
         CategoryManager.shared.updateItemOrder(in: catId, itemIds: uuidIds)
         reloadData()
@@ -762,7 +729,6 @@ extension HistoryWindowController: NSTableViewDelegate {
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? NSTableCellView ?? {
             let newCell = NSTableCellView()
             newCell.identifier = identifier
-
             let textField = NSTextField(labelWithString: "")
             textField.translatesAutoresizingMaskIntoConstraints = false
             textField.cell?.lineBreakMode = .byTruncatingTail
@@ -771,7 +737,6 @@ extension HistoryWindowController: NSTableViewDelegate {
             textField.maximumNumberOfLines = 2
             newCell.addSubview(textField)
             newCell.textField = textField
-
             NSLayoutConstraint.activate([
                 textField.leadingAnchor.constraint(equalTo: newCell.leadingAnchor, constant: 12),
                 textField.trailingAnchor.constraint(equalTo: newCell.trailingAnchor, constant: -12),
@@ -779,7 +744,6 @@ extension HistoryWindowController: NSTableViewDelegate {
             ])
             return newCell
         }()
-
         let item = filteredItems[row]
         cell.textField?.stringValue = item.text
         cell.textField?.textColor = .labelColor
@@ -827,12 +791,8 @@ extension HistoryWindowController {
     func handleKeyEvent(_ event: NSEvent) -> Bool {
         guard isVisible else { return false }
 
-        // If the key window is not our panel (e.g., an NSAlert modal dialog is showing),
-        // let all keys pass through so text input works normally.
-        guard NSApp.keyWindow === window else { return false }
-
         switch event.keyCode {
-        case 36: // Return — require Command modifier to avoid conflict with text editing
+        case 36: // Return — require Command modifier
             if event.modifierFlags.contains(.command) {
                 performPaste()
                 return true
@@ -846,7 +806,7 @@ extension HistoryWindowController {
             }
             hide()
             return true
-        case 51: // Delete — require Command modifier to avoid conflict with text editing
+        case 51: // Delete — require Command modifier
             if event.modifierFlags.contains(.command) {
                 deleteSelected()
                 return true
