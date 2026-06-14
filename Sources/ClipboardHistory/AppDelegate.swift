@@ -6,6 +6,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var eventMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Check accessibility permissions (needed for simulating Cmd+V)
+        checkAccessibilityPermissions()
+
         // Setup menu bar icon
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -37,6 +40,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return nil // consumed
             }
             return event
+        }
+    }
+
+    private func checkAccessibilityPermissions() {
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as NSString: true]
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        if !trusted {
+            // The system will show a prompt asking the user to grant Accessibility permissions.
+            // Show an additional alert to explain why it's needed.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                let alert = NSAlert()
+                alert.messageText = "需要辅助功能权限"
+                alert.informativeText = "剪贴板历史需要「辅助功能」权限才能模拟 Cmd+V 粘贴操作。\n\n请前往「系统设置 → 隐私与安全性 → 辅助功能」中，将本应用添加到允许列表。\n\n添加后，请重新启动本应用。"
+                alert.addButton(withTitle: "好的")
+                alert.alertStyle = .informational
+                alert.runModal()
+            }
         }
     }
 

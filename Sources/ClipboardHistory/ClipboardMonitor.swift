@@ -31,6 +31,18 @@ class ClipboardMonitor {
         isPasting = false
     }
 
+    /// Pause monitoring for async paste operations.
+    /// Must call resume() after the paste completes.
+    func pauseUntilNextPaste() {
+        isPasting = true
+    }
+
+    /// Resume monitoring after an async paste operation.
+    func resume() {
+        lastChangeCount = NSPasteboard.general.changeCount
+        isPasting = false
+    }
+
     private func check() {
         guard !isPasting else { return }
 

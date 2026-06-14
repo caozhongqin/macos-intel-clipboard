@@ -183,12 +183,18 @@ class HistoryWindowController: NSObject {
         let item = items[selectedRow]
         hide()
 
-        // Switch back to the previous app, then paste
-        if let app = previousApp {
-            app.activate(options: .activateIgnoringOtherApps)
+        // Switch back to the previous app
+        guard let app = previousApp else { return }
+        app.activate(options: .activateIgnoringOtherApps)
+
+        // Protect clipboard monitoring from detecting our change while we're async
+        ClipboardMonitor.shared.pauseUntilNextPaste()
+
+        // Use async dispatch to let the runloop process app activation
+        // before we post keyboard events. Thread.sleep() would block the runloop.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [item] in
+            PasteManager.shared.paste(text: item.text)
         }
-        Thread.sleep(forTimeInterval: 0.05)
-        PasteManager.shared.paste(text: item.text)
     }
 
     func deleteSelected() {
