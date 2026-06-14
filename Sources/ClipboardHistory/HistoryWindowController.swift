@@ -8,8 +8,10 @@ class HistoryWindowController: NSObject {
     private let tableView: NSTableView
     private let scrollView: NSScrollView
     private let visualEffectView: NSVisualEffectView
+    private let searchField: NSSearchField
 
-    private var items: [HistoryItem] = []
+    private var allItems: [HistoryItem] = []
+    private var filteredItems: [HistoryItem] = []
     private var isVisible = false
     private var previousApp: NSRunningApplication?
 
@@ -29,6 +31,11 @@ class HistoryWindowController: NSObject {
         visualEffectView.wantsLayer = true
         visualEffectView.layer?.cornerRadius = 12
         visualEffectView.layer?.masksToBounds = true
+
+        // Create search field
+        searchField = NSSearchField()
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.placeholderString = "搜索剪贴板历史..."
 
         // Create table column first (doesn't need self)
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("text"))
@@ -58,6 +65,9 @@ class HistoryWindowController: NSObject {
         // Now we can use self after super.init
         tableView.target = self
         tableView.doubleAction = #selector(doubleClickRow)
+        searchField.target = self
+        searchField.action = #selector(searchAction)
+        searchField.delegate = self
 
         // Configure window
         window.isOpaque = false
@@ -78,6 +88,7 @@ class HistoryWindowController: NSObject {
         tableView.translatesAutoresizingMaskIntoConstraints = false
 
         window.contentView?.addSubview(visualEffectView)
+        visualEffectView.addSubview(searchField)
         visualEffectView.addSubview(scrollView)
 
         if let contentView = window.contentView {
@@ -87,7 +98,11 @@ class HistoryWindowController: NSObject {
                 visualEffectView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
                 visualEffectView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-                scrollView.topAnchor.constraint(equalTo: visualEffectView.topAnchor, constant: 24),
+                searchField.topAnchor.constraint(equalTo: visualEffectView.topAnchor, constant: 12),
+                searchField.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor, constant: 12),
+                searchField.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor, constant: -12),
+
+                scrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
                 scrollView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor, constant: 8),
                 scrollView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor, constant: -8),
                 scrollView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor, constant: -8)
@@ -122,6 +137,7 @@ class HistoryWindowController: NSObject {
         // Remember which app was frontmost before we show our panel
         previousApp = NSWorkspace.shared.frontmostApplication
 
+        searchField.stringValue = ""
         reloadData()
         positionWindow()
         window.makeKeyAndOrderFront(nil)
@@ -130,7 +146,7 @@ class HistoryWindowController: NSObject {
 
         // Focus on table and select first row
         window.makeFirstResponder(tableView)
-        if !items.isEmpty {
+        if !filteredItems.isEmpty {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
     }
@@ -143,12 +159,26 @@ class HistoryWindowController: NSObject {
     // MARK: - Reload
 
     func reloadData() {
-        items = HistoryManager.shared.recentItems(limit: 30)
+        allItems = HistoryManager.shared.recentItems(limit: 30)
+        applyFilter()
+    }
+
+    private func applyFilter() {
+        let searchText = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if searchText.isEmpty {
+            filteredItems = allItems
+        } else {
+            filteredItems = allItems.filter { $0.text.localizedCaseInsensitiveContains(searchText) }
+        }
         tableView.reloadData()
 
         // Show/hide empty state
         if let emptyField = scrollView.viewWithTag(999) as? NSTextField {
-            emptyField.isHidden = !items.isEmpty
+            // Show empty state only when there are no items at all (not just filtered)
+            emptyField.isHidden = !filteredItems.isEmpty
+            emptyField.stringValue = filteredItems.isEmpty && !allItems.isEmpty
+                ? "未找到匹配结果"
+                : "暂无剪贴板历史"
             emptyField.frame = NSRect(
                 x: (scrollView.bounds.width - 200) / 2,
                 y: scrollView.bounds.height / 2 - 10,
@@ -156,6 +186,19 @@ class HistoryWindowController: NSObject {
                 height: 20
             )
         }
+
+        // Ensure selection is valid
+        if !filteredItems.isEmpty {
+            if tableView.selectedRow < 0 || tableView.selectedRow >= filteredItems.count {
+                tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            }
+        }
+    }
+
+    // MARK: - Search Action
+
+    @objc private func searchAction(_ sender: NSSearchField) {
+        applyFilter()
     }
 
     // MARK: - Positioning
@@ -179,8 +222,8 @@ class HistoryWindowController: NSObject {
 
     func performPaste() {
         let selectedRow = tableView.selectedRow
-        guard selectedRow >= 0, selectedRow < items.count else { return }
-        let item = items[selectedRow]
+        guard selectedRow >= 0, selectedRow < filteredItems.count else { return }
+        let item = filteredItems[selectedRow]
         hide()
 
         // Switch back to the previous app
@@ -199,13 +242,13 @@ class HistoryWindowController: NSObject {
 
     func deleteSelected() {
         let selectedRow = tableView.selectedRow
-        guard selectedRow >= 0, selectedRow < items.count else { return }
-        let item = items[selectedRow]
+        guard selectedRow >= 0, selectedRow < filteredItems.count else { return }
+        let item = filteredItems[selectedRow]
         HistoryManager.shared.remove(id: item.id)
         reloadData()
 
         // Select the same row or previous
-        let newRow = min(selectedRow, items.count - 1)
+        let newRow = min(selectedRow, filteredItems.count - 1)
         if newRow >= 0 {
             tableView.selectRowIndexes(IndexSet(integer: newRow), byExtendingSelection: false)
         }
@@ -216,7 +259,7 @@ class HistoryWindowController: NSObject {
 
 extension HistoryWindowController: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        items.count
+        filteredItems.count
     }
 }
 
@@ -247,7 +290,7 @@ extension HistoryWindowController: NSTableViewDelegate {
             return newCell
         }()
 
-        let item = items[row]
+        let item = filteredItems[row]
         cell.textField?.stringValue = item.text
         cell.textField?.textColor = .labelColor
         cell.toolTip = item.text
@@ -282,6 +325,18 @@ class CustomRowView: NSTableRowView {
     }
 }
 
+// MARK: - NSSearchFieldDelegate
+
+extension HistoryWindowController: NSSearchFieldDelegate {
+    func searchFieldDidStartSearching(_ sender: NSSearchField) {
+        // User started typing in the search field
+    }
+
+    func searchFieldDidEndSearching(_ sender: NSSearchField) {
+        // User cleared the search or ended editing
+    }
+}
+
 // MARK: - Keyboard Navigation
 
 extension HistoryWindowController {
@@ -289,11 +344,24 @@ extension HistoryWindowController {
     func handleKeyEvent(_ event: NSEvent) -> Bool {
         guard isVisible else { return false }
 
+        // If the search field is currently being edited, don't intercept any keys.
+        // This allows normal text input (including Delete/Backspace) to work in the search field
+        // without accidentally deleting list items.
+        if searchField.currentEditor() != nil {
+            return false
+        }
+
         switch event.keyCode {
         case 36: // Return
             performPaste()
             return true
         case 53: // Escape
+            // If there's search text, clear it instead of hiding
+            if !searchField.stringValue.isEmpty {
+                searchField.stringValue = ""
+                applyFilter()
+                return true
+            }
             hide()
             return true
         case 51: // Delete
