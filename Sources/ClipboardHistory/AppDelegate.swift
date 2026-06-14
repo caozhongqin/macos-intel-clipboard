@@ -23,6 +23,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "清空历史", action: #selector(clearHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "使用说明…", action: #selector(showHelp), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
 
@@ -61,6 +63,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func manageCategories() {
         HistoryWindowController.shared.show()
+    }
+
+    @objc private func showHelp() {
+        HelpWindow.shared.show()
     }
 
     @objc private func clearHistory() {
