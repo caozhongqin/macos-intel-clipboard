@@ -14,12 +14,24 @@
 
 ## 安装
 
-### 方法一：直接编译运行
+### 方法一：使用 Makefile（推荐）
 
 ```bash
-# 使用 Makefile 构建并运行
+# 完整构建 + 打包 + 签名（适用于正式使用）
+make bundle
+
+# 构建 + 打包 + 签名，然后运行
 make run
+
+# 仅清理构建产物
+make clean
 ```
+
+`make bundle` 会自动完成：
+1. 清理旧的构建产物
+2. 编译 Swift 源码
+3. 创建 `.app` 包结构
+4. 使用开发者证书进行 `codesign` 签名
 
 ### 方法二：使用 Swift Package Manager
 
@@ -31,7 +43,7 @@ swift build
 .build/debug/ClipboardHistory
 ```
 
-### 方法三：手动编译
+### 方法三：手动编译（无签名，仅用于调试）
 
 ```bash
 mkdir -p .build
@@ -44,6 +56,8 @@ swiftc \
   -O \
   -whole-module-optimization
 ```
+
+> ⚠️ **注意**：手动编译不会对 `.app` 进行签名。如需要可运行的应用包，请使用 `make bundle`。
 
 ## 使用说明
 
