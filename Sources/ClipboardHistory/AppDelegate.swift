@@ -20,6 +20,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "显示剪贴板历史", action: #selector(toggleWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "管理分类…", action: #selector(manageCategories), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "清空历史", action: #selector(clearHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -47,8 +49,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as NSString: true]
         let trusted = AXIsProcessTrustedWithOptions(options)
         if !trusted {
-            // The system will show a prompt asking the user to grant Accessibility permissions.
-            // Show an additional alert to explain why it's needed.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 let alert = NSAlert()
                 alert.messageText = "需要辅助功能权限"
@@ -64,16 +64,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         HistoryWindowController.shared.toggle()
     }
 
+    @objc private func manageCategories() {
+        // Show the window first to ensure it's visible, then open category management
+        HistoryWindowController.shared.show()
+        // The "管理分类…" action is triggered through the popup button
+    }
+
     @objc private func clearHistory() {
         let alert = NSAlert()
-        alert.messageText = "确认清空所有剪贴板历史？"
-        alert.informativeText = "此操作不可撤销。"
+        alert.messageText = "确认清空系统剪贴板历史？"
+        alert.informativeText = "仅清空系统剪贴板历史记录，自定义分类不受影响。此操作不可撤销。"
         alert.addButton(withTitle: "清空")
         alert.addButton(withTitle: "取消")
         alert.alertStyle = .warning
 
         if alert.runModal() == .alertFirstButtonReturn {
-            HistoryManager.shared.clear()
+            CategoryManager.shared.clearDefaultHistory()
             HistoryWindowController.shared.reloadData()
         }
     }

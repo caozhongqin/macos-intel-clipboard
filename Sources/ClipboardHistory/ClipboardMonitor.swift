@@ -54,7 +54,7 @@ class ClipboardMonitor {
 
         for item in items {
             if let text = item.string(forType: .string) {
-                HistoryManager.shared.add(text: text)
+                CategoryManager.shared.addToDefaultHistory(text: text)
                 break
             }
         }

@@ -1,76 +1,35 @@
 import Foundation
 import AppKit
 
+/// HistoryManager is now a thin wrapper around CategoryManager for backward compatibility.
+/// All data is stored in CategoryManager.
 class HistoryManager {
     static let shared = HistoryManager()
 
     private(set) var items: [HistoryItem] = []
 
-    private init() {
-        load()
-    }
+    private init() {}
 
     // MARK: - Public API
 
-    /// Add a new item to history. If an item with the same text exists,
-    /// it is removed first (so the new one becomes the most recent).
+    /// Add a new item to default history
     func add(text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        // Remove duplicate
-        items.removeAll { $0.text == trimmed }
-
-        let newItem = HistoryItem(id: UUID(), text: trimmed, timestamp: Date())
-        items.insert(newItem, at: 0)
-
-        // Enforce max count
-        if items.count > kMaxHistoryCount {
-            items = Array(items.prefix(kMaxHistoryCount))
-        }
-
-        save()
+        CategoryManager.shared.addToDefaultHistory(text: text)
     }
 
-    /// Remove a specific item by id
+    /// Remove a specific item by id from the default category
     func remove(id: UUID) {
-        items.removeAll { $0.id == id }
-        save()
+        guard let defaultCat = CategoryManager.shared.defaultCategory else { return }
+        _ = CategoryManager.shared.deleteItem(from: defaultCat.id, itemId: id)
     }
 
-    /// Clear all history
+    /// Clear all default history
     func clear() {
-        items.removeAll()
-        save()
+        CategoryManager.shared.clearDefaultHistory()
     }
 
-    /// Get recent items (up to `limit`)
+    /// Get recent items from default category
     func recentItems(limit: Int = 30) -> [HistoryItem] {
-        Array(items.prefix(limit))
-    }
-
-    // MARK: - Persistence
-
-    private func save() {
-        do {
-            let data = try JSONEncoder().encode(items)
-            try data.write(to: URL(fileURLWithPath: kHistoryFilePath), options: .atomic)
-        } catch {
-            NSLog("Clipboard: Failed to save history: \(error)")
-        }
-    }
-
-    private func load() {
-        let url = URL(fileURLWithPath: kHistoryFilePath)
-        guard FileManager.default.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url) else {
-            return
-        }
-        do {
-            items = try JSONDecoder().decode([HistoryItem].self, from: data)
-        } catch {
-            NSLog("Clipboard: Failed to load history: \(error)")
-            items = []
-        }
+        CategoryManager.shared.defaultHistoryItems(limit: limit)
     }
 }
