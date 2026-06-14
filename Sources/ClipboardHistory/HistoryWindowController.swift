@@ -350,18 +350,13 @@ class HistoryWindowController: NSObject {
               let cat = CategoryManager.shared.categories.first(where: { $0.id == catId }),
               !cat.isDefault else { return }
 
-        let alert = NSAlert()
-        alert.messageText = "添加代码块"
-        alert.informativeText = "输入代码内容："
-        alert.addButton(withTitle: "添加")
-        alert.addButton(withTitle: "取消")
-
-        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 20))
-        textField.placeholderString = "输入代码或文本..."
-        alert.accessoryView = textField
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            let text = textField.stringValue
+        let (text, accepted) = showMultilineInputDialog(
+            title: "添加代码块",
+            message: "输入代码内容：",
+            placeholder: "输入代码或文本...",
+            defaultValue: ""
+        )
+        if accepted, !text.isEmpty {
             _ = CategoryManager.shared.addItem(to: catId, text: text)
             reloadData()
             if !filteredItems.isEmpty {
@@ -410,18 +405,13 @@ class HistoryWindowController: NSObject {
         guard selectedRow >= 0, selectedRow < filteredItems.count else { return }
         let item = filteredItems[selectedRow]
 
-        let alert = NSAlert()
-        alert.messageText = "编辑代码块"
-        alert.informativeText = "修改代码内容："
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "取消")
-
-        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 20))
-        textField.stringValue = item.text
-        alert.accessoryView = textField
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            let newText = textField.stringValue
+        let (newText, accepted) = showMultilineInputDialog(
+            title: "编辑代码块",
+            message: "修改代码内容：",
+            placeholder: nil,
+            defaultValue: item.text
+        )
+        if accepted, !newText.isEmpty {
             _ = CategoryManager.shared.updateItem(in: catId, itemId: item.id, newText: newText)
             reloadData()
         }
@@ -444,6 +434,47 @@ class HistoryWindowController: NSObject {
 
     @objc private func searchAction(_ sender: NSSearchField) {
         applyFilter()
+    }
+
+    // MARK: - Multiline Input Dialog
+
+    /// Shows a dialog with a multiline text view (NSTextView) instead of a single-line NSTextField.
+    /// Returns the entered text and whether the user accepted.
+    private func showMultilineInputDialog(title: String, message: String, placeholder: String?, defaultValue: String) -> (String, Bool) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 120))
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .bezelBorder
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 360, height: 120))
+        textView.font = NSFont.systemFont(ofSize: 13)
+        textView.string = defaultValue
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.autoresizingMask = [.width, .height]
+
+        if defaultValue.isEmpty {
+            textView.string = ""
+        }
+
+        scrollView.documentView = textView
+
+        alert.accessoryView = scrollView
+
+        // Make text view the first responder
+        alert.window.initialFirstResponder = textView
+
+        let response = alert.runModal()
+        let text = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return (text, response == .alertFirstButtonReturn)
     }
 
     // MARK: - Category Management Sheet
@@ -795,7 +826,10 @@ extension HistoryWindowController: NSSearchFieldDelegate {
 extension HistoryWindowController {
     func handleKeyEvent(_ event: NSEvent) -> Bool {
         guard isVisible else { return false }
-        if searchField.currentEditor() != nil { return false }
+
+        // If the key window is not our panel (e.g., an NSAlert modal dialog is showing),
+        // let all keys pass through so text input works normally.
+        guard NSApp.keyWindow === window else { return false }
 
         switch event.keyCode {
         case 36: // Return — require Command modifier to avoid conflict with text editing
