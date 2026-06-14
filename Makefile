@@ -29,6 +29,7 @@ bundle: build
 	rm -rf $(APP_BUNDLE_DIR)
 	mkdir -p $(MACOS_DIR)
 	mkdir -p $(RESOURCES_DIR)
+	cp Sources/ClipboardHistory/AppIcon.png $(RESOURCES_DIR)/
 	cp $(BUILD_DIR)/$(APP_NAME) $(BINARY)
 	cp Info.plist $(CONTENTS_DIR)/
 	touch $(APP_BUNDLE_DIR)
